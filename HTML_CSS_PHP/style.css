@@ -1,0 +1,51 @@
+#content .grid {
+    max-width: 1400px;
+    margin: 0 auto;
+    display: grid;
+    grid-gap: 20px;
+}
+
+#content .item {
+    background: rgba(200, 255, 255, 0.5);
+    box-shadow: 0 0 0 3px #000;
+    width: 100%;
+    aspect-ratio: 4 / 3;
+}
+
+#content .grid {
+    grid-template-columns: repeat(4, minmax(250px, 1fr));
+}
+
+@media (max-width: 1160px) {
+    #content .grid {
+        grid-template-columns: repeat(3, minmax(250px, 1fr));
+    }
+}
+
+@media (max-width: 890px) {
+    #content .grid {
+        grid-template-columns: repeat(2, minmax(250px, 1fr));
+    }
+}
+
+@media (max-width: 800px) {
+    #content .grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+#content .item .div {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #930;
+}
+
+#content .item img {
+    position: absolute;
+    left: 0px;
+    top: 0px;
+    width: 100%;
+}
+

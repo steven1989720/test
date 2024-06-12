@@ -72,35 +72,6 @@ abstract class Vehicle {
     }
 }
 
-class Car extends Vehicle {
-    use GPS, AirConditioning;
-
-    public $doors = true;
-    public $fuel = 0;
-
-    public function __construct($wheels, $doors, $fuel) {
-        parent::__construct($wheels);
-        $this->doors = $doors;
-        $this->fuel = $fuel;
-    }
-
-    public function startEngine() {
-        if(parent::startEngine()) {
-            if ($this->fuel > 0) {
-                echo "Car is going.\n";
-            } else {
-                echo "Car has no fuel. Please refuel.\n";
-            }
-        } else {
-            echo "Please close the doors before starting the engine!\n";
-        }
-    }
-
-    public function canMove() {
-        return $this->doors && $this->fuel > 0;
-    }
-}
-
 class Bike extends Vehicle {
     public $ride = false;
 
@@ -114,45 +85,119 @@ class Bike extends Vehicle {
     }
 }
 
-class Truck extends Vehicle implements FuelConsumption, MaintenanceSchedule {
+class DoorVehicle extends Vehicle {
     use GPS, AirConditioning;
 
-    public $cargoCapacity;
-    public $currentLoad = 0;
-    public $fuelLevel;
-    public $mileage;
+    public $doors = true;
 
-    public function __construct($wheels, $cargoCapacity, $fuelLevel, $mileage) {
+    public function __construct($wheels, $doors) {
         parent::__construct($wheels);
-        $this->cargoCapacity = $cargoCapacity;
-        $this->fuelLevel = $fuelLevel;
-        $this->mileage = $mileage;
+        $this->doors = $doors;
+    }
+    
+    public function canMove() {
+        return $this->doors;
+    }
+}
+
+class ElectricCar extends DoorVehicle {
+    public $batteryCharge = 100;
+
+    public function __construct($wheels, $doors, $batteryCharge) {
+        parent::__construct($wheels, $doors);
+        $this->batteryCharge = $batteryCharge;
+    }
+
+    public function startEngine() {
+        if ($this->hasBattery()) {
+            parent::startEngine();
+            echo "Electric car is ready to go.\n";
+        } else {
+            echo "Electric car has no battery charge. Please charge the battery.\n";
+        }
     }
 
     public function canMove() {
-        return $this->fuelLevel > 0 && $this->currentLoad <= $this->cargoCapacity;
+        return parent::canMove() && $this->hasBattery();
     }
 
-    public function fuelEfficiency() {
-        // the truck's fuel efficiency is 2 km per liter and decreases by 0.1 km/l for every ton of cargo
-        $baseEfficiency = 2; // km per liter
-        $efficiencyLossPerTon = 0.1;
-        $actualEfficiency = $baseEfficiency - ($this->currentLoad * $efficiencyLossPerTon);
-        echo "Current fuel efficiency: $actualEfficiency km/l.\n";
+    protected function hasBattery() {
+        return $this->batteryCharge > 0;
+    }
+}
+
+class FuelVehicle extends DoorVehicle implements MaintenanceSchedule, FuelConsumption {
+    public $fuelLevel = 0;
+    public $mileage = 0;
+    public $maintenanceInterval = 15000;// maintenance is required every 15,000 km
+
+    public function __construct($wheels, $doors, $fuelLevel, $mileage, $maintenanceInterval) {
+        parent::__construct($wheels, $doors);
+
+        $this->fuelLevel = $fuelLevel;
+        $this->mileage = $mileage;
+        $this->maintenanceInterval = $maintenanceInterval;
+    }
+
+    public function startEngine() {
+        if(parent::startEngine()) {
+            if ($this->fuelLevel > 0) {
+                echo "Car is going.\n";
+            } else {
+                echo "Car has no fuel. Please refuel.\n";
+            }
+        } else {
+            echo "Please close the doors before starting the engine!\n";
+        }
+    }
+
+    public function canMove() {
+        return parent::canMove() && $this->fuelLevel > 0;
     }
 
     public function nextScheduledMaintenance() {
-        // maintenance is required every 15,000 km
-        $maintenanceInterval = 15000;
-        $nextMaintenance = $this->mileage + $maintenanceInterval - ($this->mileage % $maintenanceInterval);
-        echo "Next scheduled maintenance at: $nextMaintenance km.\n";
+        return $this->mileage + $this->maintenanceInterval - ($this->mileage % $this->maintenanceInterval);
+    }
+
+    public function fuelEfficiency() {
+        return $this->calcFuelEfficiency();
+    }
+
+    public function refuel($liters) {
+        $this->fuelLevel += $liters;
+    }
+
+    protected function calcFuelEfficiency() {
+        return 1;
+    }
+}
+
+class Truck extends FuelVehicle {
+    public $cargoCapacity;
+    public $currentLoad = 0;
+
+    public function __construct($wheels, $doors, $fuelLevel, $mileage, $cargoCapacity) {
+        parent::__construct($wheels, $doors, $fuelLevel, $mileage, 15000);
+
+        $this->cargoCapacity = $cargoCapacity;
+    }
+
+    public function canMove() {
+        return parent::canMove() && $this->currentLoad <= $this->cargoCapacity;
+    }
+
+    protected function calcFuelEfficiency() {
+        // the truck's fuel efficiency is 2 km per liter and decreases by 0.1 km/l for every ton of cargo
+        $baseEfficiency = 2; // km per liter
+        $efficiencyLossPerTon = 0.1;
+
+        return $baseEfficiency - ($this->currentLoad * $efficiencyLossPerTon);
     }
 
     // Additional methods to manage cargo and fuel
     public function loadCargo($amount) {
         if ($this->currentLoad + $amount <= $this->cargoCapacity) {
             $this->currentLoad += $amount;
-            echo "Loaded $amount tons of cargo. Current load: $this->currentLoad tons.\n";
         } else {
             echo "Cannot load $amount tons of cargo. Exceeds cargo capacity.\n";
         }
@@ -161,80 +206,38 @@ class Truck extends Vehicle implements FuelConsumption, MaintenanceSchedule {
     public function unloadCargo($amount) {
         if ($this->currentLoad - $amount >= 0) {
             $this->currentLoad -= $amount;
-            echo "Unloaded $amount tons of cargo. Current load: $this->currentLoad tons.\n";
         } else {
             echo "Cannot unload $amount tons of cargo. Not enough cargo to unload.\n";
         }
     }
-
-    public function refuel($liters) {
-        $this->fuelLevel += $liters;
-        echo "Truck refueled with $liters liters. Current fuel level: $this->fuelLevel liters.\n";
-    }
 }
 
-class ElectricCar extends Car {
-    public $batteryCharge = 100;
-
-    public function __construct($wheels, $doors, $batteryCharge) {
-        parent::__construct($wheels, $doors, 0); // Electric cars start with no fuel
-        $this->batteryCharge = $batteryCharge;
-    }
-
-    public function startEngine() {
-        if (parent::startEngine()) {
-            if ($this->batteryCharge > 0) {
-                echo "Electric car is ready to go.\n";
-            } else {
-                echo "Electric car has no battery charge. Please charge the battery.\n";
-            }
-        }
-    }
-
-    public function canMove() {
-        return $this->doors && $this->batteryCharge > 0;
-    }
-}
-
-class Bus extends Vehicle implements FuelConsumption, MaintenanceSchedule {
-    use AirConditioning;
-
+class Bus extends FuelVehicle {
     private $passengerCapacity;
     private $currentPassengers = 0;
-    private $fuelLevel;
-    private $mileage;
 
-    public function __construct($wheels, $passengerCapacity, $fuelLevel, $mileage) {
-        parent::__construct($wheels);
+    public function __construct($wheels, $doors, $fuelLevel, $mileage, $passengerCapacity) {
+        parent::__construct($wheels, $doors, $fuelLevel, $mileage, 10000);
+
         $this->passengerCapacity = $passengerCapacity;
-        $this->fuelLevel = $fuelLevel;
-        $this->mileage = $mileage;
     }
 
     public function canMove() {
-        return $this->fuelLevel > 0 && $this->currentPassengers <= $this->passengerCapacity;
+        return parent::canMove() && $this->currentPassengers <= $this->passengerCapacity;
     }
 
-    public function nextScheduledMaintenance() {
-        // maintenance is required every 10,000 km
-        $maintenanceInterval = 10000;
-        $nextMaintenance = $this->mileage + $maintenanceInterval - ($this->mileage % $maintenanceInterval);
-        echo "Next scheduled maintenance at: $nextMaintenance km.\n";
-    }
-
-    public function fuelEfficiency() {
+    protected function calcFuelEfficiency() {
         // fuel efficiency decreases by 1% for every additional passenger
         $baseEfficiency = 5; // km per liter
         $efficiencyLossPerPassenger = 0.01;
-        $actualEfficiency = $baseEfficiency * (1 - ($this->currentPassengers * $efficiencyLossPerPassenger));
-        echo "Current fuel efficiency: $actualEfficiency km/l.\n";
+        
+        return $baseEfficiency * (1 - ($this->currentPassengers * $efficiencyLossPerPassenger));
     }
 
     // Additional methods to manage passengers and fuel
     public function boardPassengers($number) {
         if ($this->currentPassengers + $number <= $this->passengerCapacity) {
             $this->currentPassengers += $number;
-            echo "$number passengers boarded the bus. Current passengers: $this->currentPassengers.\n";
         } else {
             echo "Not enough space for $number passengers.\n";
         }
@@ -243,16 +246,8 @@ class Bus extends Vehicle implements FuelConsumption, MaintenanceSchedule {
     public function disembarkPassengers($number) {
         if ($this->currentPassengers - $number >= 0) {
             $this->currentPassengers -= $number;
-            echo "$number passengers have disembarked. Current passengers: $this->currentPassengers.\n";
         } else {
             echo "Cannot disembark $number passengers.\n";
         }
     }
-
-    public function refuel($liters) {
-        $this->fuelLevel += $liters;
-        echo "Bus refueled with $liters liters. Current fuel level: $this->fuelLevel liters.\n";
-    }
 }
-
-?>
